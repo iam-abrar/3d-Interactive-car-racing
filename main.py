@@ -3,7 +3,6 @@ from OpenGL.GLUT import *
 from OpenGL.GLU import *
 import random
 import time
-import math
 import sys
 
 # Game states
@@ -11,8 +10,8 @@ STATE_MENU, STATE_PLAYING, STATE_PAUSED, STATE_GAME_OVER = 0, 1, 2, 3
 game_state = STATE_MENU
 
 # Game settings
-window_width, window_height = 1000, 800
-menu_options = ['Easy', 'Medium', 'Hard']
+window_w, window_h = 1000, 800
+all_menu = ['Easy', 'Medium', 'Hard']
 menu_index = 0
 top_scores = [0, 0, 0]
 
@@ -22,9 +21,9 @@ player_color = [0, 0.5, 1]  # Default blue color
 score = 0
 distance = 0  # Distance meter
 fuel = 100  # Fuel system (0-100)
-base_speed = 2
+base_speed = 5
 speed = base_speed
-base_spawn_interval = 2.0
+base_spawn_interval = 3.0
 spawn_interval = base_spawn_interval
 last_spawn_time = time.time()
 last_frame_time = time.time()
@@ -44,24 +43,17 @@ difficulty_increase_interval = 350  # Points needed to increase difficulty
 next_difficulty_increase = difficulty_increase_interval
 difficulty_level = 1
 max_difficulty_level = 10
-
-# difficulty presets for menu_options
 difficulties = {
     'Easy':   {'speed': 2.0, 'spawn': 2.0, 'fuel_drain': 0.5, 'enemy_move_chance': 0.02},
     'Medium': {'speed': 3.0, 'spawn': 1.5, 'fuel_drain': 1.0, 'enemy_move_chance': 0.05},
     'Hard':   {'speed': 4.0, 'spawn': 1.0, 'fuel_drain': 1.5, 'enemy_move_chance': 0.08},
 }
-
-
-# Enemy AI settings
 enemy_move_timers = {}
 enemy_lane_change_speeds = {}
-
-# Score values
 SCORE_VALUES = {
-    'distance': 1,  # per meter
-    'blue_car': 10,
-    'perks': 5
+    'distance': 10,  # per meter
+    'blue_car': 100,
+    'perks': 50
 }
 
 # Button states
@@ -77,7 +69,7 @@ def draw_text(x, y, text, font=GLUT_BITMAP_HELVETICA_18):
     glMatrixMode(GL_PROJECTION)
     glPushMatrix()
     glLoadIdentity()
-    gluOrtho2D(0, window_width, 0, window_height)
+    gluOrtho2D(0, window_w, 0, window_h)
     glMatrixMode(GL_MODELVIEW)
     glPushMatrix()
     glLoadIdentity()
@@ -90,8 +82,8 @@ def draw_text(x, y, text, font=GLUT_BITMAP_HELVETICA_18):
     glMatrixMode(GL_MODELVIEW)
 
 
-def draw_button(x, y, width, height, text, active=False):
-    # Button background
+def button_design(x, y, width, height, text, active=False):
+    # Button 
     if active:
         glColor3f(0.125, 0.2, 0.1)
     else:
@@ -113,7 +105,7 @@ def draw_button(x, y, width, height, text, active=False):
     glVertex2f(x, y + height)
     glEnd()
 
-    # Button text
+    # Button 
     text_width = sum(glutBitmapWidth(GLUT_BITMAP_HELVETICA_18, ord(c)) for c in text)
     text_x = x + (width - text_width) / 2
     text_y = y + (height - 18) / 2 + 18  # 18 is approximate font height
@@ -121,7 +113,7 @@ def draw_button(x, y, width, height, text, active=False):
     draw_text(text_x, text_y, text)
 
 
-def draw_car_body(color):
+def car_body_shape(color):
     glPushMatrix()
     # Main body
     glColor3f(*color)
@@ -201,7 +193,6 @@ def draw_player():
         # position the car
         glTranslatef(player_pos[0], 30, player_pos[2])
 
-        # optional tint for nitro/shield
         if nitro_active:
             glColor3f(0, 0, 1)
         elif shield_active:
@@ -209,10 +200,8 @@ def draw_player():
         else:
             glColor3fv(player_color)
 
-        # draw the car body
-        draw_car_body(player_color)
+        car_body_shape(player_color)
 
-        # draw shield sphere if active
         if shield_active:
             glColor4f(1, 1, 0, 0.3)
             glEnable(GL_BLEND)
@@ -223,12 +212,10 @@ def draw_player():
         glPopMatrix()
 
 
-def draw_track():
+def road_track():
     global object_rotation
-
     glPushMatrix()
     try:
-        # Draw multiple segments of the road
         for i in range(20):
             z = (i * -200 + track_z_offset) % 4000 - 2000
 
@@ -278,7 +265,6 @@ def draw_track():
             glutSolidCube(1)
             glPopMatrix()
 
-            # Street lamps (more realistic)
             if i % 2 == 0:
                 for side in [-1, 1]:
                     glPushMatrix()
@@ -318,8 +304,8 @@ def draw_track():
 
                     glPopMatrix()
 
-            # Bushes and plants (slower movement)
-            if i % 3 == 0:  # Fewer plants for better performance
+            # Bushes and plants 
+            if i % 5 == 0:  # Fewer plants for better performance
                 for side in [-1, 1]:
                     glPushMatrix()
                     plant_z = z + (random.random() - 0.5) * 100  # Reduced movement range
@@ -327,11 +313,11 @@ def draw_track():
                                  -20 + random.random() * 10,
                                  plant_z)
 
-                    # Bush base
+                    # B base
                     glColor3f(0, 0.4 + random.random() * 0.3, 0)
                     glutSolidSphere(15 + random.random() * 10, 10, 10)
 
-                    # Flowers for some bushes
+                
                     if random.random() > 0.7:
                         glColor3f(1, random.random(), 0)
                         glPushMatrix()
@@ -344,7 +330,7 @@ def draw_track():
         glPopMatrix()
 
 
-def draw_nitro(x, y, z):
+def nitro_shape(x, y, z):
     glPushMatrix()
     try:
         glTranslatef(x, y, z)
@@ -379,7 +365,7 @@ def draw_nitro(x, y, z):
         glMatrixMode(GL_PROJECTION)
         glPushMatrix()
         glLoadIdentity()
-        gluOrtho2D(0, window_width, 0, window_height)
+        gluOrtho2D(0, window_w, 0, window_h)
         glMatrixMode(GL_MODELVIEW)
         glPushMatrix()
         glLoadIdentity()
@@ -387,7 +373,7 @@ def draw_nitro(x, y, z):
         # Convert 3D position to 2D screen position
         screen_pos = gluProject(x, y + 60, z)
         if screen_pos[2] < 1:  # Only draw if object is visible
-            draw_text(screen_pos[0] - 20, window_height - screen_pos[1], "NITRO")
+            draw_text(screen_pos[0] - 20, window_h - screen_pos[1], "NITRO")
 
         glPopMatrix()
         glMatrixMode(GL_PROJECTION)
@@ -422,14 +408,14 @@ def draw_shield(x, y, z):
         glMatrixMode(GL_PROJECTION)
         glPushMatrix()
         glLoadIdentity()
-        gluOrtho2D(0, window_width, 0, window_height)
+        gluOrtho2D(0, window_w, 0, window_h)
         glMatrixMode(GL_MODELVIEW)
         glPushMatrix()
         glLoadIdentity()
 
         screen_pos = gluProject(x, y + 60, z)
         if screen_pos[2] < 1:
-            draw_text(screen_pos[0] - 25, window_height - screen_pos[1], "SHIELD")
+            draw_text(screen_pos[0] - 25, window_h - screen_pos[1], "SHIELD")
 
         glPopMatrix()
         glMatrixMode(GL_PROJECTION)
@@ -439,7 +425,7 @@ def draw_shield(x, y, z):
         glPopMatrix()
 
 
-def draw_fuel_can(x, y, z):
+def fuel_can_shape(x, y, z):
     glPushMatrix()
     try:
         glTranslatef(x, y, z)
@@ -473,14 +459,14 @@ def draw_fuel_can(x, y, z):
         glMatrixMode(GL_PROJECTION)
         glPushMatrix()
         glLoadIdentity()
-        gluOrtho2D(0, window_width, 0, window_height)
+        gluOrtho2D(0, window_w, 0, window_h)
         glMatrixMode(GL_MODELVIEW)
         glPushMatrix()
         glLoadIdentity()
 
         screen_pos = gluProject(x, y + 60, z)
         if screen_pos[2] < 1:
-            draw_text(screen_pos[0] - 20, window_height - screen_pos[1], "FUEL")
+            draw_text(screen_pos[0] - 20, window_h - screen_pos[1], "FUEL")
 
         glPopMatrix()
         glMatrixMode(GL_PROJECTION)
@@ -490,26 +476,26 @@ def draw_fuel_can(x, y, z):
         glPopMatrix()
 
 
-def draw_obstacles():
+def obstacles_design():
     for o in obstacles:
         if o['type'] == 'red':
             # Red enemy car
             glPushMatrix()
             glTranslatef(o['x'], 30, o['z'])
-            draw_car_body([1, 0, 0])  # Red color
+            car_body_shape([1, 0, 0])  # Red color
 
-            # Name label
+          
             glMatrixMode(GL_PROJECTION)
             glPushMatrix()
             glLoadIdentity()
-            gluOrtho2D(0, window_width, 0, window_height)
+            gluOrtho2D(0, window_w, 0, window_h)
             glMatrixMode(GL_MODELVIEW)
             glPushMatrix()
             glLoadIdentity()
 
             screen_pos = gluProject(o['x'], 90, o['z'])
             if screen_pos[2] < 1:
-                draw_text(screen_pos[0] - 25, window_height - screen_pos[1], "DANGER")
+                draw_text(screen_pos[0] - 25, window_h - screen_pos[1], "DANGER")
 
             glPopMatrix()
             glMatrixMode(GL_PROJECTION)
@@ -521,20 +507,20 @@ def draw_obstacles():
             # Blue point car
             glPushMatrix()
             glTranslatef(o['x'], 30, o['z'])
-            draw_car_body([0, 0, 1])  # Blue color
+            car_body_shape([0, 0, 1])  # Blue color
 
             # Name label
             glMatrixMode(GL_PROJECTION)
             glPushMatrix()
             glLoadIdentity()
-            gluOrtho2D(0, window_width, 0, window_height)
+            gluOrtho2D(0, window_w, 0, window_h)
             glMatrixMode(GL_MODELVIEW)
             glPushMatrix()
             glLoadIdentity()
 
             screen_pos = gluProject(o['x'], 90, o['z'])
             if screen_pos[2] < 1:
-                draw_text(screen_pos[0] - 15, window_height - screen_pos[1], "+10")
+                draw_text(screen_pos[0] - 15, window_h - screen_pos[1], "+10")
 
             glPopMatrix()
             glMatrixMode(GL_PROJECTION)
@@ -543,14 +529,14 @@ def draw_obstacles():
 
             glPopMatrix()
         elif o['type'] == 'nitro':
-            draw_nitro(o['x'], 30, o['z'])
+            nitro_shape(o['x'], 30, o['z'])
         elif o['type'] == 'shield':
             draw_shield(o['x'], 30, o['z'])
         elif o['type'] == 'fuel':
-            draw_fuel_can(o['x'], 30, o['z'])
+            fuel_can_shape(o['x'], 30, o['z'])
 
 
-def draw_hud():
+def hud_info():
     # Score
     draw_text(10, 770, f"Score: {score}")
 
@@ -565,7 +551,7 @@ def draw_hud():
     glMatrixMode(GL_PROJECTION)
     glPushMatrix()
     glLoadIdentity()
-    gluOrtho2D(0, window_width, 0, window_height)
+    gluOrtho2D(0, window_w, 0, window_h)
     glMatrixMode(GL_MODELVIEW)
     glPushMatrix()
     glLoadIdentity()
@@ -641,7 +627,7 @@ def draw_game_controls():
     glMatrixMode(GL_PROJECTION)
     glPushMatrix()
     glLoadIdentity()
-    gluOrtho2D(0, window_width, 0, window_height)
+    gluOrtho2D(0, window_w, 0, window_h)
     glMatrixMode(GL_MODELVIEW)
     glPushMatrix()
     glLoadIdentity()
@@ -652,10 +638,10 @@ def draw_game_controls():
         if (game_state == STATE_PLAYING and btn['text'] == "Pause") or \
                 (game_state == STATE_PAUSED and btn['text'] == "Play"):
             active = True
-        draw_button(btn['x'], btn['y'], btn['w'], btn['h'], btn['text'], active)
+        button_design(btn['x'], btn['y'], btn['w'], btn['h'], btn['text'], active)
 
     # Always show restart button
-    draw_button(buttons['restart']['x'], buttons['restart']['y'],
+    button_design(buttons['restart']['x'], buttons['restart']['y'],
                 buttons['restart']['w'], buttons['restart']['h'],
                 buttons['restart']['text'], False)
 
@@ -668,7 +654,7 @@ def draw_game_controls():
 def setup_camera():
     glMatrixMode(GL_PROJECTION)
     glLoadIdentity()
-    gluPerspective(90, window_width / window_height, 1, 2000)
+    gluPerspective(90, window_w / window_h, 1, 2000)
     glMatrixMode(GL_MODELVIEW)
     glLoadIdentity()
 
@@ -687,46 +673,38 @@ def update_obstacles(dt):
 
     new_obstacles = []
     for o in obstacles:
-        o['z'] += speed * 100 * dt
+        o['z'] += speed * 200 * dt
 
-        # Enemy car AI - lane changing (for both red and blue cars)
         if o['type'] in ['red', 'blue']:
             if id(o) not in enemy_move_timers:
-                enemy_move_timers[id(o)] = time.time() + random.uniform(1, 3)
-                enemy_lane_change_speeds[id(o)] = random.uniform(0.5, 2.0)
+                enemy_move_timers[id(o)] = time.time() + random.uniform(2, 4)
+                enemy_lane_change_speeds[id(o)] = random.uniform(0.8, 3.0)
 
             if time.time() > enemy_move_timers[id(o)]:
                 # Calculate lane change probability based on difficulty
-                base_chance = difficulties[menu_options[menu_index]]['enemy_move_chance']
+                base_chance = difficulties[all_menu[menu_index]]['enemy_move_chance']
                 level_bonus = (difficulty_level / max_difficulty_level) * 0.05
                 total_chance = min(base_chance + level_bonus, 0.1)  # Cap at 10% chance
 
                 if random.random() < total_chance:
-                    # Choose target lane (can be same lane to simulate hesitation)
                     possible_lanes = [-100, 0, 100]
                     if o['x'] in possible_lanes:
                         possible_lanes.remove(o['x'])  # Prefer changing lanes
                     target_x = random.choice(possible_lanes)
 
-                    # Store target for smooth movement
                     o['target_x'] = target_x
                     o['original_x'] = o['x']
                     o['lane_change_start'] = time.time()
                     o['lane_change_duration'] = random.uniform(0.5, 1.5) / enemy_lane_change_speeds[id(o)]
 
                 enemy_move_timers[id(o)] = time.time() + random.uniform(1, 3)
-
-            # Smooth lane changing if target is set
             if 'target_x' in o and o['target_x'] is not None:
                 elapsed = time.time() - o['lane_change_start']
                 progress = min(elapsed / o['lane_change_duration'], 1.0)
-
-                # Cubic easing for smoother movement
                 progress = progress * progress * (3 - 2 * progress)
                 o['x'] = o['original_x'] + (o['target_x'] - o['original_x']) * progress
-
                 if progress >= 1.0:
-                    o['x'] = o['target_x']  # Ensure exact position
+                    o['x'] = o['target_x']
                     o['target_x'] = None
 
         if o['z'] < 300:
@@ -803,8 +781,8 @@ def update():
 
     if game_state == STATE_PLAYING:
         distance += speed * dt * 10
-        score += int(SCORE_VALUES['distance'] * speed * dt * 10)  # Distance-based points
-        fuel -= difficulties[menu_options[menu_index]]['fuel_drain'] * dt
+        score += int(SCORE_VALUES['distance'] * speed * dt * 5)  # Distance-based points
+        fuel -= difficulties[all_menu[menu_index]]['fuel_drain'] * dt
 
         if fuel <= 0:
             end_game()
@@ -850,12 +828,12 @@ def end_game():
 
 def show_screen():
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-    glViewport(0, 0, window_width, window_height)
+    glViewport(0, 0, window_w, window_h)
     setup_camera()
 
     if game_state == STATE_MENU:
         draw_text(400, 700, "Select Difficulty with ↑ ↓, Press Enter")
-        for i, opt in enumerate(menu_options):
+        for i, opt in enumerate(all_menu):
             prefix = "▶ " if i == menu_index else "   "
             draw_text(400, 650 - i * 40, f"{prefix}{opt}")
         draw_text(400, 500, "Top Scores:")
@@ -863,17 +841,17 @@ def show_screen():
             draw_text(400, 470 - i * 30, f"{i + 1}. {s}")
 
     elif game_state in [STATE_PLAYING, STATE_PAUSED]:
-        draw_track()
+        road_track()
         draw_player()
-        draw_obstacles()
-        draw_hud()
+        obstacles_design()
+        hud_info()
         draw_game_controls()
 
         if game_state == STATE_PAUSED:
             glMatrixMode(GL_PROJECTION)
             glPushMatrix()
             glLoadIdentity()
-            gluOrtho2D(0, window_width, 0, window_height)
+            gluOrtho2D(0, window_w, 0, window_h)
             glMatrixMode(GL_MODELVIEW)
             glPushMatrix()
             glLoadIdentity()
@@ -884,9 +862,9 @@ def show_screen():
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
             glBegin(GL_QUADS)
             glVertex2f(0, 0)
-            glVertex2f(window_width, 0)
-            glVertex2f(window_width, window_height)
-            glVertex2f(0, window_height)
+            glVertex2f(window_w, 0)
+            glVertex2f(window_w, window_h)
+            glVertex2f(0, window_h)
             glEnd()
             glDisable(GL_BLEND)
 
@@ -908,7 +886,7 @@ def show_screen():
 
 def mouse_click(button, state, x, y):
     if button == GLUT_LEFT_BUTTON and state == GLUT_DOWN:
-        y = window_height - y  # Convert to OpenGL coordinates
+        y = window_h - y  # Convert to OpenGL coordinates
 
         # Check button clicks
         for name, btn in buttons.items():
@@ -937,7 +915,7 @@ def keyboard(key, x, y):
 
     if game_state == STATE_MENU:
         if key in ['\r', '\n']:  # Enter key
-            start_game_with(menu_options[menu_index])
+            start_game_with(all_menu[menu_index])
     elif game_state == STATE_PLAYING:
         if key == 'a':
             player_pos[0] = max(-200, player_pos[0] - 100)
@@ -977,9 +955,9 @@ def special_keys(key, x, y):
     global menu_index
     if game_state == STATE_MENU:
         if key == GLUT_KEY_UP:
-            menu_index = (menu_index - 1) % len(menu_options)
+            menu_index = (menu_index - 1) % len(all_menu)
         elif key == GLUT_KEY_DOWN:
-            menu_index = (menu_index + 1) % len(menu_options)
+            menu_index = (menu_index + 1) % len(all_menu)
         glutPostRedisplay()
 
 
@@ -1051,7 +1029,7 @@ def init():
 def main():
     glutInit(sys.argv)
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH)
-    glutInitWindowSize(window_width, window_height)
+    glutInitWindowSize(window_w, window_h)
     glutCreateWindow(b"Enhanced 3D Racing Game")
     init()
     glutDisplayFunc(show_screen)
